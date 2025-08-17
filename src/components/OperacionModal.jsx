@@ -335,6 +335,10 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="bg-gray-50 p-4 rounded-md text-center text-gray-500">
+              No se encontraron datos para esta operación.
+            </div>
           )}
         </div>
       </div>
