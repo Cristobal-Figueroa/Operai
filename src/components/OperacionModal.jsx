@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react';
 import { getOperacionById, updateOperacion } from '../firebase/operacionesService';
 
+// Función para formatear números con separador de miles
+const formatearNumero = (numero) => {
+  if (numero === '' || numero === null || numero === undefined) return '';
+  // Convertir a número y luego a string con formato
+  return parseFloat(numero).toLocaleString('es-CL');
+};
+
+// Función para quitar el formato y convertir a número
+const desformatearNumero = (texto) => {
+  if (texto === '' || texto === null || texto === undefined) return '';
+  // Quitar todos los puntos y convertir a número
+  return texto.replace(/\./g, '');
+};
+
 export default function OperacionModal({ isOpen, onClose, operacionId }) {
   const [operacion, setOperacion] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [participantes, setParticipantes] = useState([]);
   const [gastoExacto, setGastoExacto] = useState(0);
+  const [gastoExactoFormateado, setGastoExactoFormateado] = useState('');
   const [montoTotal, setMontoTotal] = useState(0);
+  const [montoTotalFormateado, setMontoTotalFormateado] = useState('');
   const [porcentajeEmpresa, setPorcentajeEmpresa] = useState(36); // Mínimo 36%
   const [guardando, setGuardando] = useState(false);
   const [mensajeExito, setMensajeExito] = useState('');
@@ -128,8 +144,17 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
   
   // Función para actualizar el gasto exacto
   const handleGastoExactoChange = (valor) => {
-    const nuevoGasto = Math.max(0, parseFloat(valor) || 0);
+    // Si el valor comienza con 0 y tiene más de un dígito, quitar el 0 inicial
+    if (valor.startsWith('0') && valor.length > 1 && !valor.startsWith('0.')) {
+      valor = valor.substring(1);
+    }
+    
+    // Quitar el formato para guardar el valor numérico
+    const valorSinFormato = desformatearNumero(valor);
+    const nuevoGasto = Math.max(0, parseFloat(valorSinFormato) || 0);
+    
     setGastoExacto(nuevoGasto);
+    setGastoExactoFormateado(valor);
     
     // Forzar la actualización del porcentaje de la empresa
     const totalParticipantes = participantes.reduce((sum, p) => sum + parseFloat(p.porcentaje || 0), 0);
@@ -140,8 +165,17 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
   
   // Función para actualizar el monto total
   const handleMontoTotalChange = (valor) => {
-    const nuevoMonto = Math.max(0, parseFloat(valor) || 0);
+    // Si el valor comienza con 0 y tiene más de un dígito, quitar el 0 inicial
+    if (valor.startsWith('0') && valor.length > 1 && !valor.startsWith('0.')) {
+      valor = valor.substring(1);
+    }
+    
+    // Quitar el formato para guardar el valor numérico
+    const valorSinFormato = desformatearNumero(valor);
+    const nuevoMonto = Math.max(0, parseFloat(valorSinFormato) || 0);
+    
     setMontoTotal(nuevoMonto);
+    setMontoTotalFormateado(valor);
     
     // Forzar la actualización del porcentaje de la empresa
     const totalParticipantes = participantes.reduce((sum, p) => sum + parseFloat(p.porcentaje || 0), 0);
@@ -374,12 +408,13 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                       <div className="mb-4">
                         <label htmlFor="montoTotal" className="block text-sm font-medium text-gray-700 mb-1">Monto Total (CLP)</label>
                         <input
-                          type="number"
+                          type="text"
                           id="montoTotal"
                           className="input w-full"
-                          value={montoTotal}
+                          value={montoTotalFormateado}
                           onChange={(e) => handleMontoTotalChange(e.target.value)}
                           disabled={guardando}
+                          onBlur={() => setMontoTotalFormateado(formatearNumero(montoTotal))}
                         />
                       </div>
 
@@ -389,12 +424,13 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                           <span className="text-sm text-gray-500">{montoTotal > 0 ? `${calcularPorcentaje(gastoExacto)}%` : '0%'}</span>
                         </div>
                         <input
-                          type="number"
+                          type="text"
                           id="gastoExacto"
                           className="input w-full"
-                          value={gastoExacto}
+                          value={gastoExactoFormateado}
                           onChange={(e) => handleGastoExactoChange(e.target.value)}
                           disabled={guardando}
+                          onBlur={() => setGastoExactoFormateado(formatearNumero(gastoExacto))}
                         />
                       </div>
 
@@ -429,22 +465,22 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                               value={participante.porcentaje}
                               onChange={(e) => handleParticipanteChange(index, e.target.value)}
                               disabled={guardando}
+                              step="0.01"
                             />
                           </div>
                         ))}
 
                         <div className="flex justify-between pt-2 border-t">
                           <span className="font-medium">Total:</span>
-                          <span className={`font-medium ${Math.abs(totalCalculado - 100) < 1.0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <span className="font-medium text-green-600">
                             {totalCalculado.toFixed(2)}%
-                            {totalCalculado > 101 ? ' (Excede 100%)' : totalCalculado < 99 ? ' (Falta para 100%)' : ''}
                           </span>
                         </div>
                         
                         <button 
                           onClick={guardarDistribucion}
-                          disabled={guardando || Math.abs(totalCalculado - 100) >= 1.0}
-                          className={`mt-3 w-full py-2 px-4 rounded-md ${Math.abs(totalCalculado - 100) < 1.0 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                          disabled={guardando}
+                          className="mt-3 w-full py-2 px-4 rounded-md bg-blue-600 hover:bg-blue-700 text-white"
                         >
                           {guardando ? (
                             <span className="flex items-center justify-center">
