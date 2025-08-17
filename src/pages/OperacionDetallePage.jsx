@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { getOperacionById } from '../firebase/operacionesService';
 
 export default function OperacionDetallePage() {
   const { id } = useParams();
@@ -8,86 +9,38 @@ export default function OperacionDetallePage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Simulación de carga de datos
-    setCargando(true);
-    setTimeout(() => {
-      // Datos de ejemplo para la operación
-      if (id === 'OP-001') {
-        setOperacion({
-          id: 'OP-001',
-          fecha: '15/08/2025',
-          cliente: 'Constructora ABC',
-          ubicacion: 'Santiago Centro',
-          tipo: 'Mapeo',
-          piloto: 'Juan Pérez',
-          ayudante: 'Carlos Rodríguez',
-          drone: 'Phantom 4 Pro',
-          horaInicio: '09:00',
-          horaFin: '11:30',
-          estado: 'Completada',
-          descripcion: 'Mapeo de terreno para proyecto de construcción',
-          observaciones: 'Se completó con éxito, sin incidentes',
-          archivos: [
-            { nombre: 'mapa_3d.obj', tipo: 'Modelo 3D', tamaño: '45MB' },
-            { nombre: 'ortofoto.tif', tipo: 'Imagen', tamaño: '120MB' },
-            { nombre: 'informe_final.pdf', tipo: 'Documento', tamaño: '2.5MB' }
-          ],
-          historial: [
-            { fecha: '10/08/2025', accion: 'Creación de la operación', usuario: 'Admin' },
-            { fecha: '12/08/2025', accion: 'Asignación de piloto y drone', usuario: 'Coordinador' },
-            { fecha: '15/08/2025', accion: 'Inicio de operación', usuario: 'Juan Pérez' },
-            { fecha: '15/08/2025', accion: 'Finalización de operación', usuario: 'Juan Pérez' },
-            { fecha: '16/08/2025', accion: 'Carga de archivos', usuario: 'Juan Pérez' }
-          ]
-        });
-      } else if (id === 'OP-002') {
-        setOperacion({
-          id: 'OP-002',
-          fecha: '16/08/2025',
-          cliente: 'Minera XYZ',
-          ubicacion: 'Antofagasta',
-          tipo: 'Inspección',
-          piloto: 'María González',
-          ayudante: 'Pedro Soto',
-          drone: 'Mavic 3',
-          horaInicio: '14:00',
-          horaFin: '16:00',
-          estado: 'En progreso',
-          descripcion: 'Inspección de instalaciones mineras',
-          observaciones: 'En proceso, clima favorable',
-          archivos: [],
-          historial: [
-            { fecha: '12/08/2025', accion: 'Creación de la operación', usuario: 'Admin' },
-            { fecha: '14/08/2025', accion: 'Asignación de piloto y drone', usuario: 'Coordinador' },
-            { fecha: '16/08/2025', accion: 'Inicio de operación', usuario: 'María González' }
-          ]
-        });
-      } else if (id === 'OP-003') {
-        setOperacion({
-          id: 'OP-003',
-          fecha: '17/08/2025',
-          cliente: 'Inmobiliaria DEF',
-          ubicacion: 'Viña del Mar',
-          tipo: 'Fotografía',
-          piloto: 'Ana Martínez',
-          ayudante: 'Luis Morales',
-          drone: 'Autel EVO II',
-          horaInicio: '10:00',
-          horaFin: '12:30',
-          estado: 'Planificada',
-          descripcion: 'Fotografía aérea de proyecto inmobiliario',
-          observaciones: 'Pendiente de confirmación por parte del cliente',
-          archivos: [],
-          historial: [
-            { fecha: '14/08/2025', accion: 'Creación de la operación', usuario: 'Admin' },
-            { fecha: '15/08/2025', accion: 'Asignación de piloto y drone', usuario: 'Coordinador' }
-          ]
-        });
-      } else {
-        setError('No se encontró la operación solicitada');
+    const cargarOperacion = async () => {
+      try {
+        setCargando(true);
+        setError(null);
+        
+        const operacionData = await getOperacionById(id);
+        
+        // Si no hay archivos o historial, inicializarlos como arrays vacíos
+        if (!operacionData.archivos) {
+          operacionData.archivos = [];
+        }
+        
+        if (!operacionData.historial) {
+          operacionData.historial = [
+            { 
+              fecha: operacionData.fecha, 
+              accion: 'Creación de la operación', 
+              usuario: 'Sistema' 
+            }
+          ];
+        }
+        
+        setOperacion(operacionData);
+      } catch (err) {
+        console.error('Error al cargar la operación:', err);
+        setError('No se pudo cargar la información de la operación. Por favor, intenta de nuevo.');
+      } finally {
+        setCargando(false);
       }
-      setCargando(false);
-    }, 800);
+    };
+    
+    cargarOperacion();
   }, [id]);
 
   // Función para obtener el color de estado

@@ -1,52 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import OperacionModal from '../components/OperacionModal';
-
-// Datos de ejemplo para la tabla de operaciones
-const operacionesIniciales = [
-  {
-    id: 'OP-001',
-    fecha: '15/08/2025',
-    cliente: 'Constructora ABC',
-    ubicacion: 'Santiago Centro',
-    tipo: 'Mapeo',
-    piloto: 'Juan Pérez',
-    ayudante: 'Carlos Rodríguez',
-    drone: 'Phantom 4 Pro',
-    horaInicio: '09:00',
-    horaFin: '11:30',
-    estado: 'Completada'
-  },
-  {
-    id: 'OP-002',
-    fecha: '16/08/2025',
-    cliente: 'Minera XYZ',
-    ubicacion: 'Antofagasta',
-    tipo: 'Inspección',
-    piloto: 'María González',
-    ayudante: 'Pedro Soto',
-    drone: 'Mavic 3',
-    horaInicio: '14:00',
-    horaFin: '16:00',
-    estado: 'En progreso'
-  },
-  {
-    id: 'OP-003',
-    fecha: '17/08/2025',
-    cliente: 'Inmobiliaria DEF',
-    ubicacion: 'Viña del Mar',
-    tipo: 'Fotografía',
-    piloto: 'Ana Martínez',
-    ayudante: 'Luis Morales',
-    drone: 'Autel EVO II',
-    horaInicio: '10:00',
-    horaFin: '12:30',
-    estado: 'Planificada'
-  }
-];
+import { getOperaciones, deleteOperacion, searchOperaciones, getOperacionesByEstado, getOperacionesOrdenadas } from '../firebase/operacionesService';
 
 export default function OperacionesPage() {
-  const [operaciones, setOperaciones] = useState(operacionesIniciales);
+  const [operaciones, setOperaciones] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [ordenarPor, setOrdenarPor] = useState('fecha');
@@ -54,7 +14,62 @@ export default function OperacionesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedOperacionId, setSelectedOperacionId] = useState(null);
 
-  // Filtrar operaciones según los criterios
+  // Cargar operaciones desde Firestore
+  useEffect(() => {
+    const cargarOperaciones = async () => {
+      try {
+        setLoading(true);
+        const data = await getOperaciones();
+        setOperaciones(data);
+        setError(null);
+      } catch (err) {
+        console.error('Error al cargar operaciones:', err);
+        setError('Error al cargar las operaciones. Por favor, intenta de nuevo.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    cargarOperaciones();
+  }, []);
+
+  // Efecto para manejar filtros y ordenamiento
+  useEffect(() => {
+    const aplicarFiltrosYOrden = async () => {
+      try {
+        setLoading(true);
+        let data;
+        
+        // Si hay un filtro de estado activo
+        if (filtroEstado) {
+          data = await getOperacionesByEstado(filtroEstado);
+        } 
+        // Si hay una búsqueda activa
+        else if (busqueda) {
+          data = await searchOperaciones(busqueda);
+        } 
+        // Si solo hay ordenamiento
+        else {
+          data = await getOperacionesOrdenadas(ordenarPor, ordenAscendente);
+        }
+        
+        setOperaciones(data);
+        setError(null);
+      } catch (err) {
+        console.error('Error al aplicar filtros:', err);
+        setError('Error al filtrar operaciones. Por favor, intenta de nuevo.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Solo aplicamos filtros si ya se cargaron las operaciones inicialmente
+    if (!loading) {
+      aplicarFiltrosYOrden();
+    }
+  }, [filtroEstado, busqueda, ordenarPor, ordenAscendente]);
+
+  // Filtrar operaciones según los criterios (como respaldo si la búsqueda en Firestore falla)
   const operacionesFiltradas = operaciones
     .filter(op => filtroEstado ? op.estado === filtroEstado : true)
     .filter(op => {
@@ -65,7 +80,7 @@ export default function OperacionesPage() {
         op.cliente.toLowerCase().includes(terminoBusqueda) ||
         op.ubicacion.toLowerCase().includes(terminoBusqueda) ||
         op.piloto.toLowerCase().includes(terminoBusqueda) ||
-        op.ayudante.toLowerCase().includes(terminoBusqueda) ||
+        (op.ayudante && op.ayudante.toLowerCase().includes(terminoBusqueda)) ||
         op.drone.toLowerCase().includes(terminoBusqueda)
       );
     })
@@ -75,8 +90,8 @@ export default function OperacionesPage() {
       
       // Para fechas, convertir a objetos Date
       if (ordenarPor === 'fecha') {
-        const [diaA, mesA, anioA] = a.fecha.split('/');
-        const [diaB, mesB, anioB] = b.fecha.split('/');
+        const [diaA, mesA, anioA] = a.fecha ? a.fecha.split('/') : [0, 0, 0];
+        const [diaB, mesB, anioB] = b.fecha ? b.fecha.split('/') : [0, 0, 0];
         valorA = new Date(anioA, mesA - 1, diaA);
         valorB = new Date(anioB, mesB - 1, diaB);
       }
@@ -87,9 +102,15 @@ export default function OperacionesPage() {
     });
 
   // Función para eliminar una operación
-  const eliminarOperacion = (id) => {
+  const eliminarOperacion = async (id) => {
     if (window.confirm('¿Estás seguro de que deseas eliminar esta operación?')) {
-      setOperaciones(operaciones.filter(op => op.id !== id));
+      try {
+        await deleteOperacion(id);
+        setOperaciones(operaciones.filter(op => op.id !== id));
+      } catch (err) {
+        console.error('Error al eliminar la operación:', err);
+        alert('Error al eliminar la operación. Por favor, intenta de nuevo.');
+      }
     }
   };
 
@@ -146,6 +167,7 @@ export default function OperacionesPage() {
               placeholder="Buscar por ID, cliente, ubicación, piloto..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
+              disabled={loading}
             />
           </div>
           <div className="w-full md:w-48">
@@ -155,6 +177,7 @@ export default function OperacionesPage() {
               className="input w-full"
               value={filtroEstado}
               onChange={(e) => setFiltroEstado(e.target.value)}
+              disabled={loading}
             >
               <option value="">Todos</option>
               <option value="Completada">Completada</option>
@@ -165,31 +188,47 @@ export default function OperacionesPage() {
           </div>
         </div>
 
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
+            <p>{error}</p>
+          </div>
+        )}
+
         <div className="flex flex-col space-y-4">
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center space-x-4">
               <button 
                 className={`flex items-center ${ordenarPor === 'fecha' ? 'font-semibold text-blue-600' : ''}`}
                 onClick={() => cambiarOrden('fecha')}
+                disabled={loading}
               >
                 Fecha {ordenarPor === 'fecha' && <span className="ml-1">{ordenAscendente ? '↑' : '↓'}</span>}
               </button>
               <button 
                 className={`flex items-center ${ordenarPor === 'cliente' ? 'font-semibold text-blue-600' : ''}`}
                 onClick={() => cambiarOrden('cliente')}
+                disabled={loading}
               >
                 Cliente {ordenarPor === 'cliente' && <span className="ml-1">{ordenAscendente ? '↑' : '↓'}</span>}
               </button>
               <button 
                 className={`flex items-center ${ordenarPor === 'id' ? 'font-semibold text-blue-600' : ''}`}
                 onClick={() => cambiarOrden('id')}
+                disabled={loading}
               >
                 ID {ordenarPor === 'id' && <span className="ml-1">{ordenAscendente ? '↑' : '↓'}</span>}
               </button>
             </div>
           </div>
 
-          {operacionesFiltradas.length > 0 ? (
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2">Cargando operaciones...</p>
+              </div>
+            </div>
+          ) : operacionesFiltradas.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {operacionesFiltradas.map((operacion) => (
                 <div key={operacion.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow duration-300">

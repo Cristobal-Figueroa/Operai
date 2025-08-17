@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { getOperacionById, createOperacion, updateOperacion } from '../firebase/operacionesService';
 
 // Datos de ejemplo para los selectores
 const pilotos = ['Juan Pérez', 'María González', 'Ana Martínez', 'Roberto Sánchez'];
@@ -34,30 +35,37 @@ export default function OperacionFormPage() {
   
   const esEdicion = !!id;
   
-  // Simular carga de datos para edición
+  // Cargar datos desde Firestore para edición
   useEffect(() => {
     if (esEdicion) {
-      setCargando(true);
-      // En un caso real, aquí se haría una llamada a la API
-      setTimeout(() => {
-        // Datos de ejemplo para edición
-        setOperacion({
-          id: 'OP-001',
-          fecha: '2025-08-15',
-          cliente: 'Constructora ABC',
-          ubicacion: 'Santiago Centro',
-          tipo: 'Mapeo',
-          piloto: 'Juan Pérez',
-          ayudante: 'Carlos Rodríguez',
-          drone: 'Phantom 4 Pro',
-          horaInicio: '09:00',
-          horaFin: '11:30',
-          estado: 'Completada',
-          descripcion: 'Mapeo de terreno para proyecto de construcción',
-          observaciones: 'Se completó con éxito, sin incidentes'
-        });
-        setCargando(false);
-      }, 500);
+      const cargarOperacion = async () => {
+        try {
+          setCargando(true);
+          const operacionData = await getOperacionById(id);
+          
+          // Formatear la fecha para el input date (YYYY-MM-DD)
+          if (operacionData.fecha) {
+            // Asumiendo que la fecha viene en formato DD/MM/YYYY
+            const partesFecha = operacionData.fecha.split('/');
+            if (partesFecha.length === 3) {
+              operacionData.fecha = `${partesFecha[2]}-${partesFecha[1].padStart(2, '0')}-${partesFecha[0].padStart(2, '0')}`;
+            }
+          }
+          
+          setOperacion(operacionData);
+        } catch (error) {
+          console.error('Error al cargar la operación:', error);
+          // Mostrar mensaje de error al usuario
+          setErrores(prev => ({
+            ...prev,
+            general: 'No se pudo cargar la información de la operación.'
+          }));
+        } finally {
+          setCargando(false);
+        }
+      };
+      
+      cargarOperacion();
     }
   }, [esEdicion, id]);
   
@@ -95,19 +103,42 @@ export default function OperacionFormPage() {
   };
   
   // Enviar formulario
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validarFormulario()) return;
     
     setGuardando(true);
+    setErrores({});
     
-    // Simular guardado (en un caso real, aquí se haría una llamada a la API)
-    setTimeout(() => {
-      setGuardando(false);
+    try {
+      // Formatear la fecha para guardarla en formato DD/MM/YYYY
+      let operacionAGuardar = {...operacion};
+      
+      if (operacionAGuardar.fecha) {
+        const fecha = new Date(operacionAGuardar.fecha);
+        operacionAGuardar.fecha = `${fecha.getDate().toString().padStart(2, '0')}/${(fecha.getMonth() + 1).toString().padStart(2, '0')}/${fecha.getFullYear()}`;
+      }
+      
+      if (esEdicion) {
+        // Actualizar operación existente
+        await updateOperacion(id, operacionAGuardar);
+      } else {
+        // Crear nueva operación
+        await createOperacion(operacionAGuardar);
+      }
+      
       // Redirigir a la lista de operaciones
       navigate('/operaciones');
-    }, 1000);
+    } catch (error) {
+      console.error('Error al guardar la operación:', error);
+      setErrores(prev => ({
+        ...prev,
+        general: 'Error al guardar la operación. Por favor, intenta de nuevo.'
+      }));
+    } finally {
+      setGuardando(false);
+    }
   };
   
   if (cargando) {
@@ -133,6 +164,11 @@ export default function OperacionFormPage() {
       </div>
       
       <div className="card">
+        {errores.general && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
+            {errores.general}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Información básica */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
