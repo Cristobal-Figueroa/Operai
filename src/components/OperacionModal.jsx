@@ -5,15 +5,17 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
   const [operacion, setOperacion] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
-  const [distribucionPago, setDistribucionPago] = useState({
-    empresa: 36,
-    piloto: 40,
-    ayudante: 14,
-    gastos: 10
-  });
+  const [participantes, setParticipantes] = useState([]);
+  const [gastoExacto, setGastoExacto] = useState(0);
   const [montoTotal, setMontoTotal] = useState(0);
+  const [porcentajeEmpresa, setPorcentajeEmpresa] = useState(36); // Mínimo 36%
   const [guardando, setGuardando] = useState(false);
   const [mensajeExito, setMensajeExito] = useState('');
+
+  // Porcentajes predeterminados
+  const PORCENTAJE_PILOTO = 14;
+  const PORCENTAJE_AYUDANTE = 8;
+  const PORCENTAJE_EMPRESA_MINIMO = 36;
 
   useEffect(() => {
     if (isOpen && operacionId) {
@@ -30,9 +32,55 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
             setMontoTotal(operacionData.montoTotal);
           }
           
-          // Establecer la distribución de pago si existe
-          if (operacionData.distribucionPago) {
-            setDistribucionPago(operacionData.distribucionPago);
+          // Establecer el gasto exacto si existe
+          if (operacionData.gastoExacto) {
+            setGastoExacto(operacionData.gastoExacto);
+          }
+          
+          // Inicializar participantes con pilotos y ayudantes
+          const nuevosParticipantes = [];
+          
+          // Agregar pilotos
+          if (operacionData.pilotos && Array.isArray(operacionData.pilotos)) {
+            operacionData.pilotos.forEach(piloto => {
+              nuevosParticipantes.push({
+                nombre: piloto,
+                tipo: 'piloto',
+                porcentaje: operacionData.distribucionPago?.pilotos?.[piloto] || PORCENTAJE_PILOTO
+              });
+            });
+          } else if (operacionData.piloto) {
+            // Compatibilidad con formato anterior
+            nuevosParticipantes.push({
+              nombre: operacionData.piloto,
+              tipo: 'piloto',
+              porcentaje: operacionData.distribucionPago?.piloto || PORCENTAJE_PILOTO
+            });
+          }
+          
+          // Agregar ayudantes
+          if (operacionData.ayudantes && Array.isArray(operacionData.ayudantes)) {
+            operacionData.ayudantes.forEach(ayudante => {
+              nuevosParticipantes.push({
+                nombre: ayudante,
+                tipo: 'ayudante',
+                porcentaje: operacionData.distribucionPago?.ayudantes?.[ayudante] || PORCENTAJE_AYUDANTE
+              });
+            });
+          } else if (operacionData.ayudante) {
+            // Compatibilidad con formato anterior
+            nuevosParticipantes.push({
+              nombre: operacionData.ayudante,
+              tipo: 'ayudante',
+              porcentaje: operacionData.distribucionPago?.ayudante || PORCENTAJE_AYUDANTE
+            });
+          }
+          
+          setParticipantes(nuevosParticipantes);
+          
+          // Establecer porcentaje de la empresa (mínimo 36%)
+          if (operacionData.distribucionPago?.empresa) {
+            setPorcentajeEmpresa(Math.max(PORCENTAJE_EMPRESA_MINIMO, operacionData.distribucionPago.empresa));
           }
           
         } catch (err) {
@@ -58,24 +106,46 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
     }
   };
 
-  // Función para actualizar la distribución de pagos
-  const handleDistribucionChange = (tipo, valor) => {
+  // Función para actualizar el porcentaje de un participante
+  const handleParticipanteChange = (index, nuevoPorcentaje) => {
     // Validar que el valor sea un número y esté entre 0 y 100
-    const nuevoValor = Math.max(0, Math.min(100, parseInt(valor) || 0));
+    const porcentaje = Math.max(0, Math.min(100, parseInt(nuevoPorcentaje) || 0));
     
-    // Calcular el total actual sin el valor que estamos cambiando
-    const totalActual = Object.entries(distribucionPago)
-      .reduce((sum, [key, val]) => key !== tipo ? sum + val : sum, 0);
+    setParticipantes(prev => {
+      const nuevosParticipantes = [...prev];
+      nuevosParticipantes[index] = {
+        ...nuevosParticipantes[index],
+        porcentaje
+      };
+      return nuevosParticipantes;
+    });
     
-    // Asegurarse de que el total no exceda 100%
-    if (totalActual + nuevoValor > 100) {
-      return; // No permitir el cambio si excede 100%
-    }
+    // Recalcular el porcentaje de la empresa
+    calcularPorcentajeEmpresa();
+  };
+  
+  // Función para actualizar el gasto exacto
+  const handleGastoExactoChange = (valor) => {
+    const nuevoGasto = Math.max(0, parseInt(valor) || 0);
+    setGastoExacto(nuevoGasto);
     
-    setDistribucionPago(prev => ({
-      ...prev,
-      [tipo]: nuevoValor
-    }));
+    // Recalcular el porcentaje de la empresa
+    calcularPorcentajeEmpresa();
+  };
+  
+  // Calcular el porcentaje de la empresa basado en los demás porcentajes
+  const calcularPorcentajeEmpresa = () => {
+    // Calcular la suma de los porcentajes de todos los participantes
+    const totalParticipantes = participantes.reduce((sum, p) => sum + p.porcentaje, 0);
+    
+    // Calcular el porcentaje que representan los gastos
+    const porcentajeGastos = montoTotal > 0 ? (gastoExacto / montoTotal) * 100 : 0;
+    
+    // El porcentaje de la empresa es lo que queda, pero mínimo 36%
+    const nuevoEmpresa = Math.max(PORCENTAJE_EMPRESA_MINIMO, 100 - totalParticipantes - porcentajeGastos);
+    setPorcentajeEmpresa(nuevoEmpresa);
+    
+    return nuevoEmpresa;
   };
 
   const guardarDistribucion = async () => {
@@ -86,18 +156,28 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
       setError(null);
       setMensajeExito('');
       
-      // Verificar que la distribución suma 100%
-      const totalDistribucion = Object.values(distribucionPago).reduce((sum, val) => sum + val, 0);
-      if (totalDistribucion !== 100) {
-        setError(`La distribución debe sumar 100%. Actualmente suma ${totalDistribucion}%`);
-        return;
-      }
+      // Crear objeto de distribución de pago
+      const distribucionPago = {
+        empresa: porcentajeEmpresa,
+        pilotos: {},
+        ayudantes: {}
+      };
       
-      // Actualizar la operación con la nueva distribución y monto
+      // Agregar porcentajes por participante
+      participantes.forEach(p => {
+        if (p.tipo === 'piloto') {
+          distribucionPago.pilotos[p.nombre] = p.porcentaje;
+        } else if (p.tipo === 'ayudante') {
+          distribucionPago.ayudantes[p.nombre] = p.porcentaje;
+        }
+      });
+      
+      // Actualizar la operación con la nueva distribución, monto y gasto
       await updateOperacion(operacion.id, {
         ...operacion,
         distribucionPago,
-        montoTotal
+        montoTotal,
+        gastoExacto
       });
       
       setMensajeExito('Distribución guardada correctamente');
@@ -116,11 +196,21 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
   };
 
   // Calcular el total de la distribución
-  const totalDistribucion = Object.values(distribucionPago).reduce((sum, value) => sum + value, 0);
+  const calcularTotalDistribucion = () => {
+    const totalParticipantes = participantes.reduce((sum, p) => sum + p.porcentaje, 0);
+    const porcentajeGastos = montoTotal > 0 ? (gastoExacto / montoTotal) * 100 : 0;
+    return totalParticipantes + porcentajeEmpresa + porcentajeGastos;
+  };
 
   // Calcular montos según porcentajes
   const calcularMonto = (porcentaje) => {
     return ((porcentaje / 100) * montoTotal).toLocaleString('es-CL');
+  };
+  
+  // Calcular el porcentaje que representa un monto exacto
+  const calcularPorcentaje = (monto) => {
+    if (montoTotal <= 0) return 0;
+    return ((monto / montoTotal) * 100).toFixed(2);
   };
 
   if (!isOpen) return null;
@@ -167,8 +257,12 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                         <span className="font-medium">{operacion.id}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Fecha:</span>
-                        <span className="font-medium">{operacion.fecha}</span>
+                        <span className="text-gray-600">Fecha Inicio:</span>
+                        <span className="font-medium">{operacion.fechaInicio}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Fecha Fin:</span>
+                        <span className="font-medium">{operacion.fechaFin}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Cliente:</span>
@@ -179,8 +273,12 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                         <span className="font-medium">{operacion.ubicacion}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Tipo:</span>
-                        <span className="font-medium">{operacion.tipo}</span>
+                        <span className="text-gray-600">Material:</span>
+                        <span className="font-medium">{operacion.material}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Hectáreas:</span>
+                        <span className="font-medium">{operacion.hectareas}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Estado:</span>
@@ -190,28 +288,39 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                   </div>
 
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">Personal y Equipo</h3>
+                    <h3 className="text-lg font-semibold mb-2">Personal</h3>
                     <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Piloto:</span>
-                        <span className="font-medium">{operacion.piloto}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Ayudante:</span>
-                        <span className="font-medium">{operacion.ayudante}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Drone:</span>
-                        <span className="font-medium">{operacion.drone}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Hora Inicio:</span>
-                        <span className="font-medium">{operacion.horaInicio}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Hora Fin:</span>
-                        <span className="font-medium">{operacion.horaFin || 'No finalizado'}</span>
-                      </div>
+                      {operacion.pilotos && operacion.pilotos.length > 0 ? (
+                        <div>
+                          <span className="text-gray-600 block mb-1">Pilotos:</span>
+                          <ul className="list-disc pl-5">
+                            {operacion.pilotos.map((piloto, index) => (
+                              <li key={`piloto-${index}`} className="font-medium">{piloto}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : operacion.piloto ? (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Piloto:</span>
+                          <span className="font-medium">{operacion.piloto}</span>
+                        </div>
+                      ) : null}
+                      
+                      {operacion.ayudantes && operacion.ayudantes.length > 0 ? (
+                        <div className="mt-2">
+                          <span className="text-gray-600 block mb-1">Ayudantes:</span>
+                          <ul className="list-disc pl-5">
+                            {operacion.ayudantes.map((ayudante, index) => (
+                              <li key={`ayudante-${index}`} className="font-medium">{ayudante}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : operacion.ayudante ? (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Ayudante:</span>
+                          <span className="font-medium">{operacion.ayudante}</span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -241,83 +350,75 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                           id="montoTotal"
                           className="input w-full"
                           value={montoTotal}
-                          onChange={(e) => setMontoTotal(Math.max(0, parseInt(e.target.value) || 0))}
+                          onChange={(e) => {
+                            setMontoTotal(Math.max(0, parseInt(e.target.value) || 0));
+                            calcularPorcentajeEmpresa();
+                          }}
+                          disabled={guardando}
+                        />
+                      </div>
+
+                      <div className="mb-4">
+                        <div className="flex justify-between mb-1">
+                          <label htmlFor="gastoExacto" className="text-sm font-medium text-gray-700">Gasto Exacto (CLP)</label>
+                          <span className="text-sm text-gray-500">{montoTotal > 0 ? `${calcularPorcentaje(gastoExacto)}%` : '0%'}</span>
+                        </div>
+                        <input
+                          type="number"
+                          id="gastoExacto"
+                          className="input w-full"
+                          value={gastoExacto}
+                          onChange={(e) => handleGastoExactoChange(e.target.value)}
                           disabled={guardando}
                         />
                       </div>
 
                       <div className="space-y-3">
+                        {/* Empresa (no editable, mínimo 36%) */}
                         <div>
                           <div className="flex justify-between mb-1">
-                            <label htmlFor="empresa" className="text-sm font-medium text-gray-700">Empresa (%)</label>
-                            <span className="text-sm text-gray-500">${calcularMonto(distribucionPago.empresa)}</span>
+                            <label className="text-sm font-medium text-gray-700">Empresa ({porcentajeEmpresa.toFixed(2)}%)</label>
+                            <span className="text-sm text-gray-500">${calcularMonto(porcentajeEmpresa)}</span>
                           </div>
-                          <input
-                            type="number"
-                            id="empresa"
-                            className="input w-full"
-                            value={distribucionPago.empresa}
-                            onChange={(e) => handleDistribucionChange('empresa', e.target.value)}
-                            disabled={guardando}
-                          />
+                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-blue-600" 
+                              style={{ width: `${porcentajeEmpresa}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">Mínimo 36% + lo que sobre después de gastos y personal</p>
                         </div>
 
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <label htmlFor="piloto" className="text-sm font-medium text-gray-700">Piloto (%)</label>
-                            <span className="text-sm text-gray-500">${calcularMonto(distribucionPago.piloto)}</span>
+                        {/* Participantes (pilotos y ayudantes) */}
+                        {participantes.map((participante, index) => (
+                          <div key={`participante-${index}`}>
+                            <div className="flex justify-between mb-1">
+                              <label className="text-sm font-medium text-gray-700">
+                                {participante.nombre} ({participante.tipo === 'piloto' ? 'Piloto' : 'Ayudante'}) (%)
+                              </label>
+                              <span className="text-sm text-gray-500">${calcularMonto(participante.porcentaje)}</span>
+                            </div>
+                            <input
+                              type="number"
+                              className="input w-full"
+                              value={participante.porcentaje}
+                              onChange={(e) => handleParticipanteChange(index, e.target.value)}
+                              disabled={guardando}
+                            />
                           </div>
-                          <input
-                            type="number"
-                            id="piloto"
-                            className="input w-full"
-                            value={distribucionPago.piloto}
-                            onChange={(e) => handleDistribucionChange('piloto', e.target.value)}
-                            disabled={guardando}
-                          />
-                        </div>
-
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <label htmlFor="ayudante" className="text-sm font-medium text-gray-700">Ayudante (%)</label>
-                            <span className="text-sm text-gray-500">${calcularMonto(distribucionPago.ayudante)}</span>
-                          </div>
-                          <input
-                            type="number"
-                            id="ayudante"
-                            className="input w-full"
-                            value={distribucionPago.ayudante}
-                            onChange={(e) => handleDistribucionChange('ayudante', e.target.value)}
-                            disabled={guardando}
-                          />
-                        </div>
-
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <label htmlFor="gastos" className="text-sm font-medium text-gray-700">Gastos (%)</label>
-                            <span className="text-sm text-gray-500">${calcularMonto(distribucionPago.gastos)}</span>
-                          </div>
-                          <input
-                            type="number"
-                            id="gastos"
-                            className="input w-full"
-                            value={distribucionPago.gastos}
-                            onChange={(e) => handleDistribucionChange('gastos', e.target.value)}
-                            disabled={guardando}
-                          />
-                        </div>
+                        ))}
 
                         <div className="flex justify-between pt-2 border-t">
                           <span className="font-medium">Total:</span>
-                          <span className={`font-medium ${totalDistribucion === 100 ? 'text-green-600' : 'text-red-600'}`}>
-                            {totalDistribucion}%
+                          <span className={`font-medium ${Math.abs(calcularTotalDistribucion() - 100) < 0.1 ? 'text-green-600' : 'text-red-600'}`}>
+                            {calcularTotalDistribucion().toFixed(2)}%
                           </span>
                         </div>
                         
                         <button 
                           onClick={guardarDistribucion}
-                          disabled={guardando || totalDistribucion !== 100}
-                          className={`mt-3 w-full py-2 px-4 rounded-md ${totalDistribucion === 100 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                          disabled={guardando || Math.abs(calcularTotalDistribucion() - 100) >= 0.1}
+                          className={`mt-3 w-full py-2 px-4 rounded-md ${Math.abs(calcularTotalDistribucion() - 100) < 0.1 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
                         >
                           {guardando ? (
                             <span className="flex items-center justify-center">
