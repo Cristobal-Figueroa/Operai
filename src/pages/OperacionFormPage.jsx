@@ -10,7 +10,6 @@ const tiposOperacion = ['Mapeo', 'Inspección', 'Fotografía', 'Filmación', 'Mo
 
 // Operación inicial vacía
 const operacionVacia = {
-  id: '',
   fecha: '',
   cliente: '',
   ubicacion: '',
@@ -125,7 +124,9 @@ export default function OperacionFormPage() {
         await updateOperacion(id, operacionAGuardar);
       } else {
         // Crear nueva operación
-        await createOperacion(operacionAGuardar);
+        const nuevaOperacion = await createOperacion(operacionAGuardar);
+        // El ID de la operación ahora viene directamente de Firestore (nuevaOperacion.id)
+        console.log('Nueva operación creada con ID:', nuevaOperacion.id);
       }
       
       // Redirigir a la lista de operaciones
