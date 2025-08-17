@@ -109,34 +109,51 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
   // Función para actualizar el porcentaje de un participante
   const handleParticipanteChange = (index, nuevoPorcentaje) => {
     // Validar que el valor sea un número y esté entre 0 y 100
-    const porcentaje = Math.max(0, Math.min(100, parseInt(nuevoPorcentaje) || 0));
+    const porcentaje = Math.max(0, Math.min(100, parseFloat(nuevoPorcentaje) || 0));
     
-    setParticipantes(prev => {
-      const nuevosParticipantes = [...prev];
-      nuevosParticipantes[index] = {
-        ...nuevosParticipantes[index],
-        porcentaje
-      };
-      return nuevosParticipantes;
-    });
+    // Actualizar el participante inmediatamente
+    const nuevosParticipantes = [...participantes];
+    nuevosParticipantes[index] = {
+      ...nuevosParticipantes[index],
+      porcentaje
+    };
+    setParticipantes(nuevosParticipantes);
     
-    // Recalcular el porcentaje de la empresa
-    calcularPorcentajeEmpresa();
+    // Forzar la actualización del porcentaje de la empresa
+    const totalParticipantes = nuevosParticipantes.reduce((sum, p) => sum + parseFloat(p.porcentaje || 0), 0);
+    const porcentajeGastos = montoTotal > 0 ? (gastoExacto / montoTotal) * 100 : 0;
+    const nuevoEmpresa = Math.max(PORCENTAJE_EMPRESA_MINIMO, 100 - totalParticipantes - porcentajeGastos);
+    setPorcentajeEmpresa(nuevoEmpresa);
   };
   
   // Función para actualizar el gasto exacto
   const handleGastoExactoChange = (valor) => {
-    const nuevoGasto = Math.max(0, parseInt(valor) || 0);
+    const nuevoGasto = Math.max(0, parseFloat(valor) || 0);
     setGastoExacto(nuevoGasto);
     
-    // Recalcular el porcentaje de la empresa
-    calcularPorcentajeEmpresa();
+    // Forzar la actualización del porcentaje de la empresa
+    const totalParticipantes = participantes.reduce((sum, p) => sum + parseFloat(p.porcentaje || 0), 0);
+    const porcentajeGastos = montoTotal > 0 ? (nuevoGasto / montoTotal) * 100 : 0;
+    const nuevoEmpresa = Math.max(PORCENTAJE_EMPRESA_MINIMO, 100 - totalParticipantes - porcentajeGastos);
+    setPorcentajeEmpresa(nuevoEmpresa);
+  };
+  
+  // Función para actualizar el monto total
+  const handleMontoTotalChange = (valor) => {
+    const nuevoMonto = Math.max(0, parseFloat(valor) || 0);
+    setMontoTotal(nuevoMonto);
+    
+    // Forzar la actualización del porcentaje de la empresa
+    const totalParticipantes = participantes.reduce((sum, p) => sum + parseFloat(p.porcentaje || 0), 0);
+    const porcentajeGastos = nuevoMonto > 0 ? (gastoExacto / nuevoMonto) * 100 : 0;
+    const nuevoEmpresa = Math.max(PORCENTAJE_EMPRESA_MINIMO, 100 - totalParticipantes - porcentajeGastos);
+    setPorcentajeEmpresa(nuevoEmpresa);
   };
   
   // Calcular el porcentaje de la empresa basado en los demás porcentajes
   const calcularPorcentajeEmpresa = () => {
     // Calcular la suma de los porcentajes de todos los participantes
-    const totalParticipantes = participantes.reduce((sum, p) => sum + p.porcentaje, 0);
+    const totalParticipantes = participantes.reduce((sum, p) => sum + parseFloat(p.porcentaje || 0), 0);
     
     // Calcular el porcentaje que representan los gastos
     const porcentajeGastos = montoTotal > 0 ? (gastoExacto / montoTotal) * 100 : 0;
@@ -144,6 +161,9 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
     // El porcentaje de la empresa es lo que queda, pero mínimo 36%
     const nuevoEmpresa = Math.max(PORCENTAJE_EMPRESA_MINIMO, 100 - totalParticipantes - porcentajeGastos);
     setPorcentajeEmpresa(nuevoEmpresa);
+    
+    // Actualizar el total calculado
+    setTotalCalculado(totalParticipantes + nuevoEmpresa + porcentajeGastos);
     
     return nuevoEmpresa;
   };
@@ -197,10 +217,18 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
 
   // Calcular el total de la distribución
   const calcularTotalDistribucion = () => {
-    const totalParticipantes = participantes.reduce((sum, p) => sum + p.porcentaje, 0);
+    const totalParticipantes = participantes.reduce((sum, p) => sum + parseFloat(p.porcentaje || 0), 0);
     const porcentajeGastos = montoTotal > 0 ? (gastoExacto / montoTotal) * 100 : 0;
     return totalParticipantes + porcentajeEmpresa + porcentajeGastos;
   };
+  
+  // Estado para almacenar el total calculado
+  const [totalCalculado, setTotalCalculado] = useState(100);
+  
+  // Recalcular el total cada vez que cambie cualquier valor relevante
+  useEffect(() => {
+    setTotalCalculado(calcularTotalDistribucion());
+  }, [participantes, porcentajeEmpresa, gastoExacto, montoTotal]);
 
   // Calcular montos según porcentajes
   const calcularMonto = (porcentaje) => {
@@ -210,7 +238,7 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
   // Calcular el porcentaje que representa un monto exacto
   const calcularPorcentaje = (monto) => {
     if (montoTotal <= 0) return 0;
-    return ((monto / montoTotal) * 100).toFixed(2);
+    return ((parseFloat(monto) / parseFloat(montoTotal)) * 100).toFixed(2);
   };
 
   if (!isOpen) return null;
@@ -350,10 +378,7 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                           id="montoTotal"
                           className="input w-full"
                           value={montoTotal}
-                          onChange={(e) => {
-                            setMontoTotal(Math.max(0, parseInt(e.target.value) || 0));
-                            calcularPorcentajeEmpresa();
-                          }}
+                          onChange={(e) => handleMontoTotalChange(e.target.value)}
                           disabled={guardando}
                         />
                       </div>
@@ -410,15 +435,16 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
 
                         <div className="flex justify-between pt-2 border-t">
                           <span className="font-medium">Total:</span>
-                          <span className={`font-medium ${Math.abs(calcularTotalDistribucion() - 100) < 0.1 ? 'text-green-600' : 'text-red-600'}`}>
-                            {calcularTotalDistribucion().toFixed(2)}%
+                          <span className={`font-medium ${Math.abs(totalCalculado - 100) < 1.0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {totalCalculado.toFixed(2)}%
+                            {totalCalculado > 101 ? ' (Excede 100%)' : totalCalculado < 99 ? ' (Falta para 100%)' : ''}
                           </span>
                         </div>
                         
                         <button 
                           onClick={guardarDistribucion}
-                          disabled={guardando || Math.abs(calcularTotalDistribucion() - 100) >= 0.1}
-                          className={`mt-3 w-full py-2 px-4 rounded-md ${Math.abs(calcularTotalDistribucion() - 100) < 0.1 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                          disabled={guardando || Math.abs(totalCalculado - 100) >= 1.0}
+                          className={`mt-3 w-full py-2 px-4 rounded-md ${Math.abs(totalCalculado - 100) < 1.0 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
                         >
                           {guardando ? (
                             <span className="flex items-center justify-center">
