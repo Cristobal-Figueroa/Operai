@@ -472,8 +472,9 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
 
                         <div className="flex justify-between pt-2 border-t">
                           <span className="font-medium">Total:</span>
-                          <span className="font-medium text-green-600">
+                          <span className={`font-medium ${totalCalculado > 100 ? 'text-red-600' : 'text-green-600'}`}>
                             {totalCalculado.toFixed(2)}%
+                            {totalCalculado > 100 ? ` (Excede en ${(totalCalculado - 100).toFixed(2)}% = $${calcularMonto(totalCalculado - 100)})` : ''}
                           </span>
                         </div>
                         
