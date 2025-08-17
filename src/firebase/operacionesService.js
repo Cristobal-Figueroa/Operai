@@ -136,14 +136,44 @@ export const searchOperaciones = async (searchTerm) => {
         id: doc.id,
         ...doc.data()
       }))
-      .filter(op => 
-        op.id.toLowerCase().includes(searchTermLower) ||
-        op.cliente.toLowerCase().includes(searchTermLower) ||
-        op.ubicacion.toLowerCase().includes(searchTermLower) ||
-        op.piloto.toLowerCase().includes(searchTermLower) ||
-        (op.ayudante && op.ayudante.toLowerCase().includes(searchTermLower)) ||
-        op.drone.toLowerCase().includes(searchTermLower)
-      );
+      .filter(op => {
+        // Verificar si el término de búsqueda está en el ID o cliente
+        if (op.id.toLowerCase().includes(searchTermLower) ||
+            (op.cliente && op.cliente.toLowerCase().includes(searchTermLower)) ||
+            (op.material && op.material.toLowerCase().includes(searchTermLower))) {
+          return true;
+        }
+        
+        // Buscar en el array de pilotos
+        if (op.pilotos && Array.isArray(op.pilotos)) {
+          if (op.pilotos.some(piloto => piloto.toLowerCase().includes(searchTermLower))) {
+            return true;
+          }
+        } else if (op.piloto && op.piloto.toLowerCase().includes(searchTermLower)) {
+          // Compatibilidad con el formato anterior
+          return true;
+        }
+        
+        // Buscar en el array de ayudantes
+        if (op.ayudantes && Array.isArray(op.ayudantes)) {
+          if (op.ayudantes.some(ayudante => ayudante.toLowerCase().includes(searchTermLower))) {
+            return true;
+          }
+        } else if (op.ayudante && op.ayudante.toLowerCase().includes(searchTermLower)) {
+          // Compatibilidad con el formato anterior
+          return true;
+        }
+        
+        // Buscar en otros campos
+        if ((op.hectareas && op.hectareas.toString().includes(searchTermLower)) ||
+            (op.fechaInicio && op.fechaInicio.toLowerCase().includes(searchTermLower)) ||
+            (op.fechaFin && op.fechaFin.toLowerCase().includes(searchTermLower)) ||
+            (op.ubicacion && op.ubicacion.toLowerCase().includes(searchTermLower))) {
+          return true;
+        }
+        
+        return false;
+      });
   } catch (error) {
     console.error("Error al buscar operaciones:", error);
     throw error;

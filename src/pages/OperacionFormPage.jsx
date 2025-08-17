@@ -3,22 +3,21 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getOperacionById, createOperacion, updateOperacion } from '../firebase/operacionesService';
 
 // Datos de ejemplo para los selectores
-const pilotos = ['Juan Pérez', 'María González', 'Ana Martínez', 'Roberto Sánchez'];
-const ayudantes = ['Carlos Rodríguez', 'Pedro Soto', 'Luis Morales', 'Sofía Vargas'];
-const drones = ['Phantom 4 Pro', 'Mavic 3', 'Autel EVO II', 'DJI Air 2S'];
+const pilotosDisponibles = ['Juan Pérez', 'María González', 'Ana Martínez', 'Roberto Sánchez'];
+const ayudantesDisponibles = ['Carlos Rodríguez', 'Pedro Soto', 'Luis Morales', 'Sofía Vargas'];
 const tiposOperacion = ['Mapeo', 'Inspección', 'Fotografía', 'Filmación', 'Monitoreo'];
+const tiposMaterial = ['Sólido', 'Líquido'];
 
 // Operación inicial vacía
 const operacionVacia = {
-  fecha: '',
+  fechaInicio: '',
+  fechaFin: '',
   cliente: '',
-  ubicacion: '',
+  hectareas: '',
+  material: '',
   tipo: '',
-  piloto: '',
-  ayudante: '',
-  drone: '',
-  horaInicio: '',
-  horaFin: '',
+  pilotos: [],
+  ayudantes: [],
   estado: 'Planificada',
   descripcion: '',
   observaciones: ''
@@ -42,14 +41,26 @@ export default function OperacionFormPage() {
           setCargando(true);
           const operacionData = await getOperacionById(id);
           
-          // Formatear la fecha para el input date (YYYY-MM-DD)
-          if (operacionData.fecha) {
+          // Formatear las fechas para los inputs date (YYYY-MM-DD)
+          if (operacionData.fechaInicio) {
             // Asumiendo que la fecha viene en formato DD/MM/YYYY
-            const partesFecha = operacionData.fecha.split('/');
-            if (partesFecha.length === 3) {
-              operacionData.fecha = `${partesFecha[2]}-${partesFecha[1].padStart(2, '0')}-${partesFecha[0].padStart(2, '0')}`;
+            const partesFechaInicio = operacionData.fechaInicio.split('/');
+            if (partesFechaInicio.length === 3) {
+              operacionData.fechaInicio = `${partesFechaInicio[2]}-${partesFechaInicio[1].padStart(2, '0')}-${partesFechaInicio[0].padStart(2, '0')}`;
             }
           }
+          
+          if (operacionData.fechaFin) {
+            // Asumiendo que la fecha viene en formato DD/MM/YYYY
+            const partesFechaFin = operacionData.fechaFin.split('/');
+            if (partesFechaFin.length === 3) {
+              operacionData.fechaFin = `${partesFechaFin[2]}-${partesFechaFin[1].padStart(2, '0')}-${partesFechaFin[0].padStart(2, '0')}`;
+            }
+          }
+          
+          // Asegurarse de que pilotos y ayudantes sean arrays
+          if (!operacionData.pilotos) operacionData.pilotos = [];
+          if (!operacionData.ayudantes) operacionData.ayudantes = [];
           
           setOperacion(operacionData);
         } catch (error) {
@@ -85,17 +96,54 @@ export default function OperacionFormPage() {
     }
   };
   
+  // Manejar cambios en los arrays de pilotos y ayudantes
+  const handlePilotoChange = (piloto, accion) => {
+    if (accion === 'agregar') {
+      setOperacion(prev => ({
+        ...prev,
+        pilotos: [...prev.pilotos, piloto]
+      }));
+    } else if (accion === 'quitar') {
+      setOperacion(prev => ({
+        ...prev,
+        pilotos: prev.pilotos.filter(p => p !== piloto)
+      }));
+    }
+    
+    // Limpiar error si existe
+    if (errores.pilotos) {
+      setErrores(prev => ({
+        ...prev,
+        pilotos: null
+      }));
+    }
+  };
+  
+  const handleAyudanteChange = (ayudante, accion) => {
+    if (accion === 'agregar') {
+      setOperacion(prev => ({
+        ...prev,
+        ayudantes: [...prev.ayudantes, ayudante]
+      }));
+    } else if (accion === 'quitar') {
+      setOperacion(prev => ({
+        ...prev,
+        ayudantes: prev.ayudantes.filter(a => a !== ayudante)
+      }));
+    }
+  };
+  
   // Validar formulario
   const validarFormulario = () => {
     const nuevosErrores = {};
     
-    if (!operacion.fecha) nuevosErrores.fecha = 'La fecha es obligatoria';
+    if (!operacion.fechaInicio) nuevosErrores.fechaInicio = 'La fecha de inicio es obligatoria';
+    if (!operacion.fechaFin) nuevosErrores.fechaFin = 'La fecha de fin es obligatoria';
     if (!operacion.cliente) nuevosErrores.cliente = 'El cliente es obligatorio';
-    if (!operacion.ubicacion) nuevosErrores.ubicacion = 'La ubicación es obligatoria';
+    if (!operacion.hectareas) nuevosErrores.hectareas = 'Las hectáreas son obligatorias';
+    if (!operacion.material) nuevosErrores.material = 'El material es obligatorio';
     if (!operacion.tipo) nuevosErrores.tipo = 'El tipo de operación es obligatorio';
-    if (!operacion.piloto) nuevosErrores.piloto = 'El piloto es obligatorio';
-    if (!operacion.drone) nuevosErrores.drone = 'El drone es obligatorio';
-    if (!operacion.horaInicio) nuevosErrores.horaInicio = 'La hora de inicio es obligatoria';
+    if (operacion.pilotos.length === 0) nuevosErrores.pilotos = 'Se requiere al menos un piloto';
     
     setErrores(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
@@ -111,12 +159,17 @@ export default function OperacionFormPage() {
     setErrores({});
     
     try {
-      // Formatear la fecha para guardarla en formato DD/MM/YYYY
+      // Formatear las fechas para guardarlas en formato DD/MM/YYYY
       let operacionAGuardar = {...operacion};
       
-      if (operacionAGuardar.fecha) {
-        const fecha = new Date(operacionAGuardar.fecha);
-        operacionAGuardar.fecha = `${fecha.getDate().toString().padStart(2, '0')}/${(fecha.getMonth() + 1).toString().padStart(2, '0')}/${fecha.getFullYear()}`;
+      if (operacionAGuardar.fechaInicio) {
+        const fechaInicio = new Date(operacionAGuardar.fechaInicio);
+        operacionAGuardar.fechaInicio = `${fechaInicio.getDate().toString().padStart(2, '0')}/${(fechaInicio.getMonth() + 1).toString().padStart(2, '0')}/${fechaInicio.getFullYear()}`;
+      }
+      
+      if (operacionAGuardar.fechaFin) {
+        const fechaFin = new Date(operacionAGuardar.fechaFin);
+        operacionAGuardar.fechaFin = `${fechaFin.getDate().toString().padStart(2, '0')}/${(fechaFin.getMonth() + 1).toString().padStart(2, '0')}/${fechaFin.getFullYear()}`;
       }
       
       if (esEdicion) {
@@ -174,18 +227,33 @@ export default function OperacionFormPage() {
           {/* Información básica */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
-              <label htmlFor="fecha" className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha <span className="text-red-500">*</span>
+              <label htmlFor="fechaInicio" className="block text-sm font-medium text-gray-700 mb-1">
+                Fecha Inicio <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                id="fecha"
-                name="fecha"
-                className={`input w-full ${errores.fecha ? 'border-red-500' : ''}`}
-                value={operacion.fecha}
+                id="fechaInicio"
+                name="fechaInicio"
+                className={`input w-full ${errores.fechaInicio ? 'border-red-500' : ''}`}
+                value={operacion.fechaInicio}
                 onChange={handleChange}
               />
-              {errores.fecha && <p className="text-red-500 text-xs mt-1">{errores.fecha}</p>}
+              {errores.fechaInicio && <p className="text-red-500 text-xs mt-1">{errores.fechaInicio}</p>}
+            </div>
+            
+            <div>
+              <label htmlFor="fechaFin" className="block text-sm font-medium text-gray-700 mb-1">
+                Fecha Fin <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                id="fechaFin"
+                name="fechaFin"
+                className={`input w-full ${errores.fechaFin ? 'border-red-500' : ''}`}
+                value={operacion.fechaFin}
+                onChange={handleChange}
+              />
+              {errores.fechaFin && <p className="text-red-500 text-xs mt-1">{errores.fechaFin}</p>}
             </div>
             
             <div>
@@ -204,18 +272,39 @@ export default function OperacionFormPage() {
             </div>
             
             <div>
-              <label htmlFor="ubicacion" className="block text-sm font-medium text-gray-700 mb-1">
-                Ubicación <span className="text-red-500">*</span>
+              <label htmlFor="hectareas" className="block text-sm font-medium text-gray-700 mb-1">
+                Hectáreas <span className="text-red-500">*</span>
               </label>
               <input
-                type="text"
-                id="ubicacion"
-                name="ubicacion"
-                className={`input w-full ${errores.ubicacion ? 'border-red-500' : ''}`}
-                value={operacion.ubicacion}
+                type="number"
+                id="hectareas"
+                name="hectareas"
+                className={`input w-full ${errores.hectareas ? 'border-red-500' : ''}`}
+                value={operacion.hectareas}
                 onChange={handleChange}
+                min="0"
+                step="0.01"
               />
-              {errores.ubicacion && <p className="text-red-500 text-xs mt-1">{errores.ubicacion}</p>}
+              {errores.hectareas && <p className="text-red-500 text-xs mt-1">{errores.hectareas}</p>}
+            </div>
+            
+            <div>
+              <label htmlFor="material" className="block text-sm font-medium text-gray-700 mb-1">
+                Material <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="material"
+                name="material"
+                className={`input w-full ${errores.material ? 'border-red-500' : ''}`}
+                value={operacion.material}
+                onChange={handleChange}
+              >
+                <option value="">Seleccionar material</option>
+                {tiposMaterial.map(material => (
+                  <option key={material} value={material}>{material}</option>
+                ))}
+              </select>
+              {errores.material && <p className="text-red-500 text-xs mt-1">{errores.material}</p>}
             </div>
             
             <div>
@@ -258,100 +347,94 @@ export default function OperacionFormPage() {
           
           {/* Personal y equipo */}
           <div className="border-t pt-6">
-            <h2 className="text-lg font-semibold mb-4">Personal y Equipo</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div>
-                <label htmlFor="piloto" className="block text-sm font-medium text-gray-700 mb-1">
-                  Piloto <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="piloto"
-                  name="piloto"
-                  className={`input w-full ${errores.piloto ? 'border-red-500' : ''}`}
-                  value={operacion.piloto}
-                  onChange={handleChange}
-                >
-                  <option value="">Seleccionar piloto</option>
-                  {pilotos.map(piloto => (
-                    <option key={piloto} value={piloto}>{piloto}</option>
-                  ))}
-                </select>
-                {errores.piloto && <p className="text-red-500 text-xs mt-1">{errores.piloto}</p>}
+            <h2 className="text-lg font-semibold mb-4">Personal</h2>
+            
+            {/* Pilotos */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Pilotos <span className="text-red-500">*</span>
+              </label>
+              {errores.pilotos && <p className="text-red-500 text-xs mb-2">{errores.pilotos}</p>}
+              
+              <div className="flex flex-wrap gap-2 mb-3">
+                {operacion.pilotos.map(piloto => (
+                  <div key={piloto} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full flex items-center">
+                    <span>{piloto}</span>
+                    <button 
+                      type="button" 
+                      className="ml-2 text-blue-600 hover:text-blue-800"
+                      onClick={() => handlePilotoChange(piloto, 'quitar')}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
               
-              <div>
-                <label htmlFor="ayudante" className="block text-sm font-medium text-gray-700 mb-1">
-                  Ayudante
-                </label>
+              <div className="flex">
                 <select
-                  id="ayudante"
-                  name="ayudante"
                   className="input w-full"
-                  value={operacion.ayudante}
-                  onChange={handleChange}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handlePilotoChange(e.target.value, 'agregar');
+                      e.target.value = '';
+                    }
+                  }}
                 >
-                  <option value="">Seleccionar ayudante</option>
-                  {ayudantes.map(ayudante => (
-                    <option key={ayudante} value={ayudante}>{ayudante}</option>
-                  ))}
+                  <option value="">Agregar piloto</option>
+                  {pilotosDisponibles
+                    .filter(p => !operacion.pilotos.includes(p))
+                    .map(piloto => (
+                      <option key={piloto} value={piloto}>{piloto}</option>
+                    ))
+                  }
                 </select>
               </div>
+            </div>
+            
+            {/* Ayudantes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ayudantes
+              </label>
               
-              <div>
-                <label htmlFor="drone" className="block text-sm font-medium text-gray-700 mb-1">
-                  Drone <span className="text-red-500">*</span>
-                </label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {operacion.ayudantes.map(ayudante => (
+                  <div key={ayudante} className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center">
+                    <span>{ayudante}</span>
+                    <button 
+                      type="button" 
+                      className="ml-2 text-green-600 hover:text-green-800"
+                      onClick={() => handleAyudanteChange(ayudante, 'quitar')}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex">
                 <select
-                  id="drone"
-                  name="drone"
-                  className={`input w-full ${errores.drone ? 'border-red-500' : ''}`}
-                  value={operacion.drone}
-                  onChange={handleChange}
+                  className="input w-full"
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleAyudanteChange(e.target.value, 'agregar');
+                      e.target.value = '';
+                    }
+                  }}
                 >
-                  <option value="">Seleccionar drone</option>
-                  {drones.map(drone => (
-                    <option key={drone} value={drone}>{drone}</option>
-                  ))}
+                  <option value="">Agregar ayudante</option>
+                  {ayudantesDisponibles
+                    .filter(a => !operacion.ayudantes.includes(a))
+                    .map(ayudante => (
+                      <option key={ayudante} value={ayudante}>{ayudante}</option>
+                    ))
+                  }
                 </select>
-                {errores.drone && <p className="text-red-500 text-xs mt-1">{errores.drone}</p>}
               </div>
             </div>
           </div>
           
-          {/* Horarios */}
-          <div className="border-t pt-6">
-            <h2 className="text-lg font-semibold mb-4">Horarios</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="horaInicio" className="block text-sm font-medium text-gray-700 mb-1">
-                  Hora de Inicio <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="time"
-                  id="horaInicio"
-                  name="horaInicio"
-                  className={`input w-full ${errores.horaInicio ? 'border-red-500' : ''}`}
-                  value={operacion.horaInicio}
-                  onChange={handleChange}
-                />
-                {errores.horaInicio && <p className="text-red-500 text-xs mt-1">{errores.horaInicio}</p>}
-              </div>
-              
-              <div>
-                <label htmlFor="horaFin" className="block text-sm font-medium text-gray-700 mb-1">
-                  Hora de Fin
-                </label>
-                <input
-                  type="time"
-                  id="horaFin"
-                  name="horaFin"
-                  className="input w-full"
-                  value={operacion.horaFin}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
-          </div>
           
           {/* Detalles adicionales */}
           <div className="border-t pt-6">
