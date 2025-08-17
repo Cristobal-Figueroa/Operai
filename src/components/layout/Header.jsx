@@ -23,7 +23,7 @@ export default function Header() {
               )}
             </svg>
           </button>
-        </div>
+        </div> 
         
         {/* Menú para escritorio */}
         <nav className="hidden md:flex space-x-6">
