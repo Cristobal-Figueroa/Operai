@@ -314,10 +314,7 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Información General</h3>
                     <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">ID:</span>
-                        <span className="font-medium">{operacion.id}</span>
-                      </div>
+                      {/* Se ocultó el ID de la operación */}
                       <div className="flex justify-between">
                         <span className="text-gray-600">Fecha Inicio:</span>
                         <span className="font-medium">{operacion.fechaInicio}</span>

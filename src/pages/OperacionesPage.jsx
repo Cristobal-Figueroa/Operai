@@ -211,13 +211,7 @@ export default function OperacionesPage() {
               >
                 Cliente {ordenarPor === 'cliente' && <span className="ml-1">{ordenAscendente ? '↑' : '↓'}</span>}
               </button>
-              <button 
-                className={`flex items-center ${ordenarPor === 'id' ? 'font-semibold text-blue-600' : ''}`}
-                onClick={() => cambiarOrden('id')}
-                disabled={loading}
-              >
-                ID {ordenarPor === 'id' && <span className="ml-1">{ordenAscendente ? '↑' : '↓'}</span>}
-              </button>
+              {/* Se eliminó el botón de ordenar por ID */}
             </div>
           </div>
 
@@ -244,10 +238,7 @@ export default function OperacionesPage() {
                     </div>
                     
                     <div className="mt-3 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500 text-sm">ID:</span>
-                        <span className="font-medium text-sm">{operacion.id}</span>
-                      </div>
+                      {/* Se ocultó el ID de la operación */}
                       <div className="flex justify-between">
                         <span className="text-gray-500 text-sm">Fecha:</span>
                         <span className="font-medium text-sm">{operacion.fecha}</span>
