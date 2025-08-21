@@ -2,17 +2,24 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getOperacionById, createOperacion, updateOperacion } from '../firebase/operacionesService';
 
-// Datos de ejemplo para los selectores
-const pilotosDisponibles = ['Juan Pérez', 'María González', 'Ana Martínez', 'Roberto Sánchez'];
-const ayudantesDisponibles = ['Carlos Rodríguez', 'Pedro Soto', 'Luis Morales', 'Sofía Vargas'];
-const tiposOperacion = ['Mapeo', 'Inspección', 'Fotografía', 'Filmación', 'Monitoreo'];
+// Datos actualizados para los selectores
+const pilotosDisponibles = ['Nicolás', 'Sergio', 'Cristobal'];
+const ayudantesDisponibles = ['Cristobal', 'Sergio', 'Sebastian', 'Benjamin'];
+const tiposOperacion = ['Pulverizacion', 'Fototelemetria'];
 const tiposMaterial = ['Sólido', 'Líquido'];
+
+// Materiales según el tipo
+const materialesPorTipo = {
+  'Sólido': ['Urea'],
+  'Líquido': ['Cobre', 'Fungicida', 'Herbicida']
+};
 
 // Operación inicial vacía
 const operacionVacia = {
   fechaInicio: '',
   fechaFin: '',
   cliente: '',
+  tipoMaterial: '',
   material: '',
   tipo: '',
   pilotos: [],
@@ -60,6 +67,17 @@ export default function OperacionFormPage() {
           // Asegurarse de que pilotos y ayudantes sean arrays
           if (!operacionData.pilotos) operacionData.pilotos = [];
           if (!operacionData.ayudantes) operacionData.ayudantes = [];
+          
+          // Determinar el tipo de material basado en el material seleccionado
+          if (operacionData.material && !operacionData.tipoMaterial) {
+            // Buscar en qué categoría está el material
+            for (const [tipo, materiales] of Object.entries(materialesPorTipo)) {
+              if (materiales.includes(operacionData.material)) {
+                operacionData.tipoMaterial = tipo;
+                break;
+              }
+            }
+          }
           
           setOperacion(operacionData);
         } catch (error) {
@@ -139,6 +157,7 @@ export default function OperacionFormPage() {
     if (!operacion.fechaInicio) nuevosErrores.fechaInicio = 'La fecha de inicio es obligatoria';
     if (!operacion.fechaFin) nuevosErrores.fechaFin = 'La fecha de fin es obligatoria';
     if (!operacion.cliente) nuevosErrores.cliente = 'El cliente es obligatorio';
+    if (!operacion.tipoMaterial) nuevosErrores.tipoMaterial = 'El tipo de material es obligatorio';
     if (!operacion.material) nuevosErrores.material = 'El material es obligatorio';
     if (!operacion.tipo) nuevosErrores.tipo = 'El tipo de operación es obligatorio';
     if (operacion.pilotos.length === 0) nuevosErrores.pilotos = 'Se requiere al menos un piloto';
@@ -168,6 +187,17 @@ export default function OperacionFormPage() {
       if (operacionAGuardar.fechaFin) {
         const fechaFin = new Date(operacionAGuardar.fechaFin);
         operacionAGuardar.fechaFin = `${fechaFin.getDate().toString().padStart(2, '0')}/${(fechaFin.getMonth() + 1).toString().padStart(2, '0')}/${fechaFin.getFullYear()}`;
+      }
+      
+      // Asegurarse de guardar el tipoMaterial
+      if (!operacionAGuardar.tipoMaterial && operacionAGuardar.material) {
+        // Intentar determinar el tipo de material basado en el material seleccionado
+        for (const [tipo, materiales] of Object.entries(materialesPorTipo)) {
+          if (materiales.includes(operacionAGuardar.material)) {
+            operacionAGuardar.tipoMaterial = tipo;
+            break;
+          }
+        }
       }
       
       if (esEdicion) {
@@ -270,6 +300,40 @@ export default function OperacionFormPage() {
             </div>
             
             <div>
+              <label htmlFor="tipoMaterial" className="block text-sm font-medium text-gray-700 mb-1">
+                Tipo de Material <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="tipoMaterial"
+                name="tipoMaterial"
+                className={`input w-full ${errores.tipoMaterial ? 'border-red-500' : ''}`}
+                value={operacion.tipoMaterial || ''}
+                onChange={(e) => {
+                  const tipoSeleccionado = e.target.value;
+                  setOperacion(prev => ({
+                    ...prev,
+                    tipoMaterial: tipoSeleccionado,
+                    material: '' // Resetear el material cuando cambia el tipo
+                  }));
+                  
+                  // Limpiar error si existe
+                  if (errores.tipoMaterial) {
+                    setErrores(prev => ({
+                      ...prev,
+                      tipoMaterial: null
+                    }));
+                  }
+                }}
+              >
+                <option value="">Seleccionar tipo de material</option>
+                {tiposMaterial.map(tipo => (
+                  <option key={tipo} value={tipo}>{tipo}</option>
+                ))}
+              </select>
+              {errores.tipoMaterial && <p className="text-red-500 text-xs mt-1">{errores.tipoMaterial}</p>}
+            </div>
+            
+            <div>
               <label htmlFor="material" className="block text-sm font-medium text-gray-700 mb-1">
                 Material <span className="text-red-500">*</span>
               </label>
@@ -279,9 +343,10 @@ export default function OperacionFormPage() {
                 className={`input w-full ${errores.material ? 'border-red-500' : ''}`}
                 value={operacion.material}
                 onChange={handleChange}
+                disabled={!operacion.tipoMaterial}
               >
                 <option value="">Seleccionar material</option>
-                {tiposMaterial.map(material => (
+                {operacion.tipoMaterial && materialesPorTipo[operacion.tipoMaterial]?.map(material => (
                   <option key={material} value={material}>{material}</option>
                 ))}
               </select>
@@ -314,15 +379,24 @@ export default function OperacionFormPage() {
               <select
                 id="estado"
                 name="estado"
-                className="input w-full"
+                className={`input w-full ${operacion.estado === 'Planificada' ? 'bg-yellow-50 border-yellow-300' : 
+                  operacion.estado === 'En progreso' ? 'bg-blue-50 border-blue-300' : 
+                  operacion.estado === 'Completada' ? 'bg-green-50 border-green-300' : 
+                  operacion.estado === 'Cancelada' ? 'bg-red-50 border-red-300' : ''}`}
                 value={operacion.estado}
                 onChange={handleChange}
               >
-                <option value="Planificada">Planificada</option>
-                <option value="En progreso">En progreso</option>
-                <option value="Completada">Completada</option>
-                <option value="Cancelada">Cancelada</option>
+                <option value="Planificada" className="bg-yellow-50">Planificada</option>
+                <option value="En progreso" className="bg-blue-50">En progreso</option>
+                <option value="Completada" className="bg-green-50">Completada</option>
+                <option value="Cancelada" className="bg-red-50">Cancelada</option>
               </select>
+              <div className="flex justify-between mt-1 text-xs">
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-md">Planificada</span>
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md">En progreso</span>
+                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-md">Completada</span>
+                <span className="px-2 py-1 bg-red-100 text-red-800 rounded-md">Cancelada</span>
+              </div>
             </div>
           </div>
           
