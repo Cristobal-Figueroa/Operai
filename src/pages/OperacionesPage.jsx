@@ -81,6 +81,8 @@ export default function OperacionesPage() {
         op.ubicacion.toLowerCase().includes(terminoBusqueda) ||
         op.piloto.toLowerCase().includes(terminoBusqueda) ||
         (op.ayudante && op.ayudante.toLowerCase().includes(terminoBusqueda)) ||
+        (op.material && op.material.toLowerCase().includes(terminoBusqueda)) ||
+        (op.tipoMaterial && op.tipoMaterial.toLowerCase().includes(terminoBusqueda)) ||
         op.drone.toLowerCase().includes(terminoBusqueda)
       );
     })
@@ -127,10 +129,10 @@ export default function OperacionesPage() {
   // Función para obtener el color de estado
   const getEstadoColor = (estado) => {
     switch (estado) {
-      case 'Completada': return 'bg-green-100 text-green-800';
-      case 'En progreso': return 'bg-blue-100 text-blue-800';
-      case 'Planificada': return 'bg-yellow-100 text-yellow-800';
-      case 'Cancelada': return 'bg-red-100 text-red-800';
+      case 'Completada': return 'estado-completada';
+      case 'En progreso': return 'estado-en-progreso';
+      case 'Planificada': return 'estado-planificada';
+      case 'Cancelada': return 'estado-cancelada';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -241,19 +243,29 @@ export default function OperacionesPage() {
                       {/* Se ocultó el ID de la operación */}
                       <div className="flex justify-between">
                         <span className="text-gray-500 text-sm">Fecha:</span>
-                        <span className="font-medium text-sm">{operacion.fecha}</span>
+                        <span className="font-medium text-sm">{operacion.fechaInicio || operacion.fecha}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500 text-sm">Ubicación:</span>
-                        <span className="font-medium text-sm">{operacion.ubicacion}</span>
+                        <span className="text-gray-500 text-sm">Pilotos:</span>
+                        <span className="font-medium text-sm">
+                          {operacion.pilotos && operacion.pilotos.length > 0 
+                            ? operacion.pilotos.join(', ')
+                            : operacion.piloto || 'No asignado'}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500 text-sm">Piloto:</span>
-                        <span className="font-medium text-sm">{operacion.piloto}</span>
+                        <span className="text-gray-500 text-sm">Ayudantes:</span>
+                        <span className="font-medium text-sm">
+                          {operacion.ayudantes && operacion.ayudantes.length > 0 
+                            ? operacion.ayudantes.join(', ')
+                            : operacion.ayudante || 'No asignado'}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500 text-sm">Horario:</span>
-                        <span className="font-medium text-sm">{operacion.horaInicio} - {operacion.horaFin || 'No finalizado'}</span>
+                        <span className="text-gray-500 text-sm">Material:</span>
+                        <span className="font-medium text-sm">
+                          {operacion.tipoMaterial ? `${operacion.tipoMaterial} - ${operacion.material}` : operacion.material}
+                        </span>
                       </div>
                     </div>
                   </div>

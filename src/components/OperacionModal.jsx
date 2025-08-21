@@ -328,16 +328,14 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                         <span className="font-medium">{operacion.cliente}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Ubicación:</span>
-                        <span className="font-medium">{operacion.ubicacion}</span>
-                      </div>
-                      <div className="flex justify-between">
                         <span className="text-gray-600">Material:</span>
-                        <span className="font-medium">{operacion.material}</span>
+                        <span className="font-medium">
+                          {operacion.tipoMaterial ? `${operacion.tipoMaterial} - ${operacion.material}` : operacion.material}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Estado:</span>
-                        <span className={`font-medium ${getEstadoColor(operacion.estado)}`}>{operacion.estado}</span>
+                        <span className={`font-medium px-2 py-1 rounded-full ${getEstadoColor(operacion.estado)}`}>{operacion.estado}</span>
                       </div>
                     </div>
                   </div>

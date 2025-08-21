@@ -97,7 +97,10 @@ export default function OperacionDetallePage() {
         <div className="flex justify-between items-start mb-4">
           <div>
             <h2 className="text-xl font-semibold">{operacion.tipo} - {operacion.cliente}</h2>
-            <p className="text-gray-600">{operacion.ubicacion}</p>
+            <p className="text-gray-600 text-sm mt-1">
+              <span className="font-medium">Material: </span>
+              {operacion.tipoMaterial ? `${operacion.tipoMaterial} - ${operacion.material}` : operacion.material}
+            </p>
           </div>
           <span className={`px-3 py-1 rounded-full text-sm ${getEstadoColor(operacion.estado)}`}>
             {operacion.estado}
