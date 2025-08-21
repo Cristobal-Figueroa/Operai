@@ -11,6 +11,11 @@
   padding: 0 1rem;
 }
 
+/* Espacio entre header y contenido */
+header + main {
+  margin-top: 2rem;
+}
+
 /* Estilos para tablas responsivas */
 .table-responsive {
   overflow-x: auto;
