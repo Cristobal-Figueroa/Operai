@@ -13,7 +13,6 @@ const operacionVacia = {
   fechaInicio: '',
   fechaFin: '',
   cliente: '',
-  hectareas: '',
   material: '',
   tipo: '',
   pilotos: [],
@@ -140,7 +139,6 @@ export default function OperacionFormPage() {
     if (!operacion.fechaInicio) nuevosErrores.fechaInicio = 'La fecha de inicio es obligatoria';
     if (!operacion.fechaFin) nuevosErrores.fechaFin = 'La fecha de fin es obligatoria';
     if (!operacion.cliente) nuevosErrores.cliente = 'El cliente es obligatorio';
-    if (!operacion.hectareas) nuevosErrores.hectareas = 'Las hectáreas son obligatorias';
     if (!operacion.material) nuevosErrores.material = 'El material es obligatorio';
     if (!operacion.tipo) nuevosErrores.tipo = 'El tipo de operación es obligatorio';
     if (operacion.pilotos.length === 0) nuevosErrores.pilotos = 'Se requiere al menos un piloto';
@@ -269,23 +267,6 @@ export default function OperacionFormPage() {
                 onChange={handleChange}
               />
               {errores.cliente && <p className="text-red-500 text-xs mt-1">{errores.cliente}</p>}
-            </div>
-            
-            <div>
-              <label htmlFor="hectareas" className="block text-sm font-medium text-gray-700 mb-1">
-                Hectáreas <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                id="hectareas"
-                name="hectareas"
-                className={`input w-full ${errores.hectareas ? 'border-red-500' : ''}`}
-                value={operacion.hectareas}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-              />
-              {errores.hectareas && <p className="text-red-500 text-xs mt-1">{errores.hectareas}</p>}
             </div>
             
             <div>

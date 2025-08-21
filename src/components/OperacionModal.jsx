@@ -339,10 +339,6 @@ export default function OperacionModal({ isOpen, onClose, operacionId }) {
                         <span className="font-medium">{operacion.material}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Hectáreas:</span>
-                        <span className="font-medium">{operacion.hectareas}</span>
-                      </div>
-                      <div className="flex justify-between">
                         <span className="text-gray-600">Estado:</span>
                         <span className={`font-medium ${getEstadoColor(operacion.estado)}`}>{operacion.estado}</span>
                       </div>
