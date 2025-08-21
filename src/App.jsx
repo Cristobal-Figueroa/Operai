@@ -37,19 +37,21 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         
         <Route path="/" element={
-          <Layout>
+          loading ? (
+            <div className="flex justify-center items-center h-screen">Cargando...</div>
+          ) : user ? (
             <Navigate to="/operaciones" replace />
-          </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
         } />
         
         <Route path="/operaciones" element={
-          <Layout>
-            {loading ? (
-              <div className="flex justify-center items-center h-screen">Cargando...</div>
-            ) : (
+          <ProtectedRoute>
+            <Layout>
               <OperacionesPage />
-            )}
-          </Layout>
+            </Layout>
+          </ProtectedRoute>
         } />
         
         <Route path="/operaciones/nueva" element={
@@ -69,12 +71,22 @@ function App() {
         } />
         
         <Route path="/operaciones/:id" element={
-          <Layout>
-            <OperacionDetallePage />
-          </Layout>
+          <ProtectedRoute>
+            <Layout>
+              <OperacionDetallePage />
+            </Layout>
+          </ProtectedRoute>
         } />
         
-        <Route path="*" element={<Navigate to="/operaciones" replace />} />
+        <Route path="*" element={
+          loading ? (
+            <div className="flex justify-center items-center h-screen">Cargando...</div>
+          ) : user ? (
+            <Navigate to="/operaciones" replace />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
       </Routes>
     </Router>
   )
